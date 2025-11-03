@@ -5,33 +5,49 @@ st.set_page_config(page_title="Sales & Promotion Dashboard", layout="wide")
 st.title("📊 Sales and Promotion Dashboard")
 
 # ====== READ DATA ======
-# Update these paths
-sales_file = "tay tay jan to oct.Xlsx"          # Example: "C:/Users/admin/Desktop/sales_data.xlsx"
-promo_file = "ANNIVERSARY OFFER LIST (1).xlsx"    # Example: "C:/Users/admin/Desktop/promo_data.xlsx"
+sales_file = "tay tay jan to oct.Xlsx"
+promo_file = "ANNIVERSARY OFFER LIST (1).xlsx"
 
 # Read Excel files
 sales_df = pd.read_excel(sales_file)
 promo_df = pd.read_excel(promo_file)
 
+# ====== CLEAN COLUMN NAMES ======
+sales_df.columns = sales_df.columns.str.strip().str.lower()
+promo_df.columns = promo_df.columns.str.strip().str.lower()
+
+# ====== FIND PROMO COLUMNS DYNAMICALLY ======
+# Common columns that may appear in promo data
+possible_promo_cols = [
+    'barcode', 'promo disc%', 'promo discount%', 'promo price1',
+    'promo price inc tax1', 'promo price inc vat1', 'margin%'
+]
+
+# Select only columns that exist in promo file
+promo_cols = [col for col in possible_promo_cols if col in promo_df.columns]
+
 # ====== MERGE DATA ======
-# Merge using Barcode column
 merged_df = pd.merge(
     sales_df,
-    promo_df[['Barcode', 'Promo Disc%', 'Promo Price1', 'Promo Price Inc Tax1', 'Margin%']],
-    on='Barcode',
+    promo_df[promo_cols],
+    on='barcode',
     how='left',
     suffixes=('', '_promo')
 )
 
-# Create Promo Included column
-merged_df["Promo Included"] = merged_df["Promo Disc%_promo"].apply(
-    lambda x: "Yes" if pd.notnull(x) and x > 0 else "No"
+# ====== CREATE PROMO INCLUDED FLAG ======
+merged_df["promo included"] = merged_df.apply(
+    lambda row: "Yes" if any(pd.notnull(row[col]) for col in promo_cols if col != "barcode") else "No",
+    axis=1
 )
 
 # ====== REORDER COLUMNS ======
-cols = ["Promo Included", "Barcode", "Item Name", "Unit", "CF", "Cost Price", "Selling", "Vat%", 
-        "Selling Inc Vat", "Promo Disc%_promo", "Promo Price1_promo", "Promo Price Inc Tax1_promo", "Margin%_promo"]
-merged_df = merged_df[[col for col in cols if col in merged_df.columns]]
+preferred_order = [
+    "promo included", "barcode", "item name", "unit", "cf", "cost price", "selling", 
+    "vat%", "selling inc vat"
+]
+extra_cols = [col for col in merged_df.columns if col not in preferred_order]
+merged_df = merged_df[[c for c in preferred_order if c in merged_df.columns] + extra_cols]
 
 # ====== COLOR STYLE ======
 def highlight_promo(val):
@@ -41,15 +57,18 @@ def highlight_promo(val):
 # ====== DISPLAY ======
 st.subheader("📈 Sales Data with Promotion Details")
 st.dataframe(
-    merged_df.style.applymap(highlight_promo, subset=["Promo Included"]),
+    merged_df.style.applymap(highlight_promo, subset=["promo included"]),
     use_container_width=True
 )
 
 # ====== METRICS ======
 total_items = len(merged_df)
-promo_items = len(merged_df[merged_df["Promo Included"] == "Yes"])
-non_promo_items = len(merged_df[merged_df["Promo Included"] == "No"])
-avg_margin = round(merged_df["Margin%_promo"].mean(skipna=True), 2)
+promo_items = len(merged_df[merged_df["promo included"] == "Yes"])
+non_promo_items = total_items - promo_items
+
+# Compute margin if exists
+margin_cols = [col for col in merged_df.columns if "margin" in col]
+avg_margin = round(merged_df[margin_cols].mean(numeric_only=True).mean(), 2) if margin_cols else 0
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Items", total_items)
