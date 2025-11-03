@@ -12,7 +12,7 @@ promo_file = "ANNIVERSARY OFFER LIST (1).xlsx"
 sales_df = pd.read_excel(sales_file)
 
 # Read promo file
-# Try reading first row as header; adjust 'header' if needed
+# Adjust 'header' if your actual headers are in a different row
 promo_df = pd.read_excel(promo_file, header=0)
 
 # ====== CLEAN COLUMN NAMES ======
