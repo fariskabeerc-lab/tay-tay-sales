@@ -8,9 +8,12 @@ st.title("📊 Sales and Promotion Dashboard")
 sales_file = "tay tay jan to oct.Xlsx"
 promo_file = "ANNIVERSARY OFFER LIST (1).xlsx"
 
-# Read Excel files
+# Read sales file
 sales_df = pd.read_excel(sales_file)
-promo_df = pd.read_excel(promo_file)
+
+# Read promo file
+# Try reading first row as header; adjust 'header' if needed
+promo_df = pd.read_excel(promo_file, header=0)
 
 # ====== CLEAN COLUMN NAMES ======
 sales_df.columns = sales_df.columns.str.strip().str.lower()
@@ -20,31 +23,38 @@ promo_df.columns = promo_df.columns.str.strip().str.lower()
 st.write("Sales columns:", sales_df.columns.tolist())
 st.write("Promo columns:", promo_df.columns.tolist())
 
-# ====== FIND PROMO COLUMNS DYNAMICALLY ======
-possible_promo_cols = [
-    'barcode', 'promo disc%', 'promo discount%', 'promo price1',
-    'promo price inc tax1', 'promo price inc vat1', 'margin%'
-]
-
-# Select only columns that exist in promo file
-promo_cols = [col for col in possible_promo_cols if col in promo_df.columns]
+# ====== CHECK FOR BARCODE ======
+if 'barcode' not in promo_df.columns:
+    st.warning("Promo file does not contain a 'barcode' column. Merge cannot be performed.")
+    promo_cols = []  # No promo columns to merge
+else:
+    # ====== FIND PROMO COLUMNS DYNAMICALLY ======
+    possible_promo_cols = [
+        'barcode', 'promo disc%', 'promo discount%', 'promo price1',
+        'promo price inc tax1', 'promo price inc vat1', 'margin%'
+    ]
+    promo_cols = [col for col in possible_promo_cols if col in promo_df.columns]
 
 # ====== MERGE DATA ======
-# Fix merge: sales_df has 'item code', promo_df has 'barcode'
-merged_df = pd.merge(
-    sales_df,
-    promo_df[promo_cols],
-    left_on='item code',
-    right_on='barcode',
-    how='left',
-    suffixes=('', '_promo')
-)
+if promo_cols:
+    merged_df = pd.merge(
+        sales_df,
+        promo_df[promo_cols],
+        left_on='item code',
+        right_on='barcode',
+        how='left',
+        suffixes=('', '_promo')
+    )
+else:
+    merged_df = sales_df.copy()
+    merged_df['promo included'] = "No"
 
 # ====== CREATE PROMO INCLUDED FLAG ======
-merged_df["promo included"] = merged_df.apply(
-    lambda row: "Yes" if any(pd.notnull(row[col]) for col in promo_cols if col != "barcode") else "No",
-    axis=1
-)
+if 'promo included' not in merged_df.columns:
+    merged_df["promo included"] = merged_df.apply(
+        lambda row: "Yes" if any(pd.notnull(row[col]) for col in promo_cols if col != "barcode") else "No",
+        axis=1
+    )
 
 # ====== REORDER COLUMNS ======
 preferred_order = [
