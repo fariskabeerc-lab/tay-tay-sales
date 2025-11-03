@@ -35,7 +35,7 @@ if not st.session_state["authenticated"]:
 st.title("📊 tay tay Insights(jan-oct 2025) and anniversary sales comparison")
 
 # --- Load Data ---
-df = pd.read_excel("sub cat(1).Xlsx")  # Change filename as needed
+df = pd.read_excel("tay tay jan to oct.Xlsx")  # Change filename as needed
 
 # Ensure numeric columns
 numeric_cols = ["Qty Sold", "Total Sales", "Total Profit"]
