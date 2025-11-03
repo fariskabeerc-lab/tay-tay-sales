@@ -1,119 +1,58 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Sales Dashboard with Promotions", layout="wide")
-st.title("📊 Full Sales Dashboard with Promotional Data")
+st.set_page_config(page_title="Sales & Promotion Dashboard", layout="wide")
+st.title("📊 Sales and Promotion Dashboard")
 
-# ===========================================================
-# --- Load Sales and Promotion Data from Local Folder ---
-# ===========================================================
+# ====== READ DATA ======
+# Update these paths
+sales_file = "tay tay jan to oct.Xlsx"          # Example: "C:/Users/admin/Desktop/sales_data.xlsx"
+promo_file = "ANNIVERSARY OFFER LIST (1).xlsx"    # Example: "C:/Users/admin/Desktop/promo_data.xlsx"
 
-# Replace with your actual file paths or names
-sales_file_path = "tay tay jan to oct.Xlsx"          # example: "data/sales_data.xlsx"
-promo_file_path = "ANNIVERSARY OFFER LIST (1).xlsx"   # example: "data/promotional_items.xlsx"
+# Read Excel files
+sales_df = pd.read_excel(sales_file)
+promo_df = pd.read_excel(promo_file)
 
-# Load Excel files
-try:
-    sales_df = pd.read_excel(sales_file_path)
-    promo_df = pd.read_excel(promo_file_path)
-    st.success("✅ Both Sales and Promotional files loaded successfully.")
-except Exception as e:
-    st.error(f"❌ Error loading files: {e}")
-    st.stop()
-
-# ===========================================================
-# --- Data Cleaning ---
-# ===========================================================
-sales_df.columns = [c.strip() for c in sales_df.columns]
-promo_df.columns = [c.strip() for c in promo_df.columns]
-
-if "Item Code" not in sales_df.columns:
-    st.error("❌ 'Item Code' column missing in sales file.")
-    st.stop()
-
-if "Barcode" not in promo_df.columns:
-    st.error("❌ 'Barcode' column missing in promo file.")
-    st.stop()
-
-# Clean merge keys
-sales_df["Item Code"] = sales_df["Item Code"].astype(str).str.strip()
-promo_df["Barcode"] = promo_df["Barcode"].astype(str).str.strip()
-
-# ===========================================================
-# --- Merge Sales and Promotion Data ---
-# ===========================================================
+# ====== MERGE DATA ======
+# Merge using Barcode column
 merged_df = pd.merge(
     sales_df,
-    promo_df[
-        [
-            "Barcode", "Item Name", "Promo Disc%", "Promo Price1",
-            "Promo Price Inc Tax1", "Margin%"
-        ]
-    ],
-    left_on="Item Code",
-    right_on="Barcode",
-    how="left"
+    promo_df[['Barcode', 'Promo Disc%', 'Promo Price1', 'Promo Price Inc Tax1', 'Margin%']],
+    on='Barcode',
+    how='left',
+    suffixes=('', '_promo')
 )
 
-# ===========================================================
-# --- Add Computed Columns ---
-# ===========================================================
-# Flag promo inclusion
-merged_df["Promo Included"] = merged_df["Promo Disc%"].notna().map({True: "Yes", False: "No"})
-
-# GP% calculation
-if "Total Profit" in merged_df.columns and "Total Sales" in merged_df.columns:
-    merged_df["GP%"] = (merged_df["Total Profit"] / merged_df["Total Sales"]) * 100
-else:
-    merged_df["GP%"] = None
-
-# Promo impact ratio
-merged_df["Promo Impact"] = merged_df["Promo Disc%"] / merged_df["GP%"]
-
-# Recommendation logic
-def promo_suggestion(row):
-    if row["Promo Included"] == "No":
-        return "⚪ Not Promoted"
-    elif pd.isna(row["Promo Impact"]):
-        return "⚪ Not Promoted"
-    elif row["Promo Impact"] > 1:
-        return "❌ Avoid - GP dropped"
-    elif 0.3 <= row["Promo Impact"] <= 1:
-        return "✅ Focus - Good balance"
-    elif row["Promo Impact"] < 0.3:
-        return "⭐ Strong - Low discount, healthy GP"
-    else:
-        return "⚪ Neutral"
-
-merged_df["Recommendation"] = merged_df.apply(promo_suggestion, axis=1)
-
-# ===========================================================
-# --- Display Data ---
-# ===========================================================
-st.markdown("### 📈 Sales Data with Promotion Status")
-
-display_cols = [
-    "Item Code", "Items", "Category", "Category4",
-    "Qty Sold", "Total Sales", "Total Profit", "GP%",
-    "Promo Included", "Promo Disc%", "Promo Price1",
-    "Promo Price Inc Tax1", "Margin%", "Recommendation"
-]
-display_cols = [col for col in display_cols if col in merged_df.columns]
-
-# Format numeric columns for readability
-for col in ["Qty Sold", "Total Sales", "Total Profit", "Promo Disc%", "GP%", "Margin%"]:
-    if col in merged_df.columns:
-        merged_df[col] = merged_df[col].apply(lambda x: f"{x:,.2f}" if pd.notna(x) else "")
-
-st.dataframe(merged_df[display_cols], use_container_width=True, hide_index=True)
-
-# ===========================================================
-# --- Download Option ---
-# ===========================================================
-csv = merged_df.to_csv(index=False).encode('utf-8')
-st.download_button(
-    "📥 Download Merged Sales + Promo Data (CSV)",
-    data=csv,
-    file_name="Sales_with_Promotion_Data.csv",
-    mime="text/csv"
+# Create Promo Included column
+merged_df["Promo Included"] = merged_df["Promo Disc%_promo"].apply(
+    lambda x: "Yes" if pd.notnull(x) and x > 0 else "No"
 )
+
+# ====== REORDER COLUMNS ======
+cols = ["Promo Included", "Barcode", "Item Name", "Unit", "CF", "Cost Price", "Selling", "Vat%", 
+        "Selling Inc Vat", "Promo Disc%_promo", "Promo Price1_promo", "Promo Price Inc Tax1_promo", "Margin%_promo"]
+merged_df = merged_df[[col for col in cols if col in merged_df.columns]]
+
+# ====== COLOR STYLE ======
+def highlight_promo(val):
+    color = "#A7F3D0" if val == "Yes" else "#FEE2E2"
+    return f"background-color: {color}"
+
+# ====== DISPLAY ======
+st.subheader("📈 Sales Data with Promotion Details")
+st.dataframe(
+    merged_df.style.applymap(highlight_promo, subset=["Promo Included"]),
+    use_container_width=True
+)
+
+# ====== METRICS ======
+total_items = len(merged_df)
+promo_items = len(merged_df[merged_df["Promo Included"] == "Yes"])
+non_promo_items = len(merged_df[merged_df["Promo Included"] == "No"])
+avg_margin = round(merged_df["Margin%_promo"].mean(skipna=True), 2)
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Items", total_items)
+col2.metric("Promo Items", promo_items)
+col3.metric("Non-Promo Items", non_promo_items)
+col4.metric("Avg Promo Margin (%)", avg_margin)
