@@ -9,8 +9,8 @@ st.title("📊 Full Sales Dashboard with Promotional Data")
 # ===========================================================
 
 # Replace with your actual file paths or names
-sales_file_path = "sales_data.xlsx"          # example: "data/sales_data.xlsx"
-promo_file_path = "promotional_items.xlsx"   # example: "data/promotional_items.xlsx"
+sales_file_path = "tay tay jan to oct.Xlsx"          # example: "data/sales_data.xlsx"
+promo_file_path = "ANNIVERSARY OFFER LIST (1).xlsx"   # example: "data/promotional_items.xlsx"
 
 # Load Excel files
 try:
