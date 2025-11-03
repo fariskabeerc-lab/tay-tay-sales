@@ -16,8 +16,11 @@ promo_df = pd.read_excel(promo_file)
 sales_df.columns = sales_df.columns.str.strip().str.lower()
 promo_df.columns = promo_df.columns.str.strip().str.lower()
 
+# ====== DEBUG: Check column names ======
+st.write("Sales columns:", sales_df.columns.tolist())
+st.write("Promo columns:", promo_df.columns.tolist())
+
 # ====== FIND PROMO COLUMNS DYNAMICALLY ======
-# Common columns that may appear in promo data
 possible_promo_cols = [
     'barcode', 'promo disc%', 'promo discount%', 'promo price1',
     'promo price inc tax1', 'promo price inc vat1', 'margin%'
@@ -27,10 +30,12 @@ possible_promo_cols = [
 promo_cols = [col for col in possible_promo_cols if col in promo_df.columns]
 
 # ====== MERGE DATA ======
+# Fix merge: sales_df has 'item code', promo_df has 'barcode'
 merged_df = pd.merge(
     sales_df,
     promo_df[promo_cols],
-    on='barcode',
+    left_on='item code',
+    right_on='barcode',
     how='left',
     suffixes=('', '_promo')
 )
@@ -66,7 +71,7 @@ total_items = len(merged_df)
 promo_items = len(merged_df[merged_df["promo included"] == "Yes"])
 non_promo_items = total_items - promo_items
 
-# Compute margin if exists
+# Compute average margin if exists
 margin_cols = [col for col in merged_df.columns if "margin" in col]
 avg_margin = round(merged_df[margin_cols].mean(numeric_only=True).mean(), 2) if margin_cols else 0
 
